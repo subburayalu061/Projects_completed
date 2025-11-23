@@ -1,0 +1,276 @@
+`timescale 1ns / 1ps
+
+module tb();
+
+// Clock and Reset
+reg clk;
+reg reset_n;
+
+// Data Inputs - All non-zero patterns
+reg [31:0] global_data_in_0, global_data_in_1, global_data_in_2, global_data_in_3;
+reg [31:0] global_weight_in_0, global_weight_in_1, global_weight_in_2, global_weight_in_3;
+
+// Control Signals
+reg global_valid;
+reg load_weights;
+reg start_computation;
+
+// Outputs
+wire [63:0] global_psum_out_0, global_psum_out_1, global_psum_out_2, global_psum_out_3;
+wire global_done;
+
+// Test counters
+reg [31:0] cycle_count;
+reg [31:0] error_count;
+
+// ==================================================
+// DUT Instantiation
+// ==================================================
+systolic_array_4x4_fixed dut (
+    .clk(clk),
+    .reset_n(reset_n),
+    .global_data_in_0(global_data_in_0),
+    .global_data_in_1(global_data_in_1),
+    .global_data_in_2(global_data_in_2),
+    .global_data_in_3(global_data_in_3),
+    .global_weight_in_0(global_weight_in_0),
+    .global_weight_in_1(global_weight_in_1),
+    .global_weight_in_2(global_weight_in_2),
+    .global_weight_in_3(global_weight_in_3),
+    .global_valid(global_valid),
+    .load_weights(load_weights),
+    .start_computation(start_computation),
+    .global_psum_out_0(global_psum_out_0),
+    .global_psum_out_1(global_psum_out_1),
+    .global_psum_out_2(global_psum_out_2),
+    .global_psum_out_3(global_psum_out_3),
+    .global_done(global_done)
+);
+
+// ==================================================
+// Clock Generation
+// ==================================================
+always #5 clk = ~clk;
+
+// ==================================================
+// Non-Zero Pattern Generation Functions
+// ==================================================
+function [31:0] generate_nonzero_data;
+    input [7:0] cycle;
+    input [1:0] port;
+    reg [31:0] result;
+    begin
+        case(port)
+            2'd0: result = {8'hAA, 8'hBB, 8'hCC, 8'hDD} + cycle;
+            2'd1: result = {8'h11, 8'h22, 8'h33, 8'h44} + (cycle * 4);
+            2'd2: result = {8'h55, 8'h66, 8'h77, 8'h88} + (cycle * 16);
+            2'd3: result = {8'h99, 8'hAA, 8'hBB, 8'hCC} + (cycle * 64);
+        endcase
+        if (result == 32'd0) 
+            result = 32'hFFFFFFFF;
+        generate_nonzero_data = result;
+    end
+endfunction
+
+function [31:0] generate_nonzero_weight;
+    input [7:0] cycle;
+    input [1:0] port;
+    reg [31:0] result;
+    begin
+        case(port)
+            2'd0: result = {8'hF0, 8'hF1, 8'hF2, 8'hF3} + cycle;
+            2'd1: result = {8'hE0, 8'hE1, 8'hE2, 8'hE3} + (cycle * 2);
+            2'd2: result = {8'hD0, 8'hD1, 8'hD2, 8'hD3} + (cycle * 4);
+            2'd3: result = {8'hC0, 8'hC1, 8'hC2, 8'hC3} + (cycle * 8);
+        endcase
+        if (result == 32'd0) 
+            result = 32'hFFFFFFFE;
+        generate_nonzero_weight = result;
+    end
+endfunction
+
+// ==================================================
+// Main Test Sequence
+// ==================================================
+initial begin
+    clk = 0;
+    reset_n = 0;
+    global_data_in_0 = 32'd0;
+    global_data_in_1 = 32'd0;
+    global_data_in_2 = 32'd0;
+    global_data_in_3 = 32'd0;
+    global_weight_in_0 = 32'd0;
+    global_weight_in_1 = 32'd0;
+    global_weight_in_2 = 32'd0;
+    global_weight_in_3 = 32'd0;
+    global_valid = 0;
+    load_weights = 0;
+    start_computation = 0;
+    cycle_count = 0;
+    error_count = 0;
+    
+    $display("==================================================");
+    $display("    VIVADO NON-ZERO FULL BITS TESTBENCH");
+    $display("==================================================");
+    
+    #100;
+    reset_n = 1;
+    #50;
+    
+    $display("\n[TEST 1] Loading Non-Zero Weights to All Processing Elements");
+    $display("=============================================================");
+    
+    global_valid = 1;
+    load_weights = 1;
+    
+    for (cycle_count = 0; cycle_count < 8; cycle_count = cycle_count + 1) begin
+        global_weight_in_0 = generate_nonzero_weight(cycle_count[7:0], 2'd0);
+        global_weight_in_1 = generate_nonzero_weight(cycle_count[7:0], 2'd1);
+        global_weight_in_2 = generate_nonzero_weight(cycle_count[7:0], 2'd2);
+        global_weight_in_3 = generate_nonzero_weight(cycle_count[7:0], 2'd3);
+        
+        $display("[CYCLE %0d] Weights: W0=%h, W1=%h, W2=%h, W3=%h", 
+                cycle_count, global_weight_in_0, global_weight_in_1, 
+                global_weight_in_2, global_weight_in_3);
+        
+        #10;
+    end
+    
+    load_weights = 0;
+    global_valid = 0;
+    #50;
+    
+    $display("\n[TEST 2] Continuous Non-Zero Data Processing (64 cycles)");
+    $display("========================================================");
+    
+    global_valid = 1;
+    start_computation = 1;
+    
+    for (cycle_count = 0; cycle_count < 64; cycle_count = cycle_count + 1) begin
+        global_data_in_0 = generate_nonzero_data(cycle_count[7:0], 2'd0);
+        global_data_in_1 = generate_nonzero_data(cycle_count[7:0], 2'd1);
+        global_data_in_2 = generate_nonzero_data(cycle_count[7:0], 2'd2);
+        global_data_in_3 = generate_nonzero_data(cycle_count[7:0], 2'd3);
+        
+        if (cycle_count >= 4) begin
+            $display("[CYCLE %0d] Data: D0=%h, D1=%h, D2=%h, D3=%h", 
+                    cycle_count, global_data_in_0, global_data_in_1, 
+                    global_data_in_2, global_data_in_3);
+            $display("         Results: P0=%h, P1=%h, P2=%h, P3=%h", 
+                    global_psum_out_0, global_psum_out_1, 
+                    global_psum_out_2, global_psum_out_3);
+            
+            if (global_psum_out_0 == 64'd0) begin
+                $display("❌ ERROR: PSUM0 is zero!");
+                error_count = error_count + 1;
+            end
+            if (global_psum_out_1 == 64'd0) begin
+                $display("❌ ERROR: PSUM1 is zero!");
+                error_count = error_count + 1;
+            end
+            if (global_psum_out_2 == 64'd0) begin
+                $display("❌ ERROR: PSUM2 is zero!");
+                error_count = error_count + 1;
+            end
+            if (global_psum_out_3 == 64'd0) begin
+                $display("❌ ERROR: PSUM3 is zero!");
+                error_count = error_count + 1;
+            end
+        end
+        
+        #10;
+    end
+    
+    start_computation = 0;
+    global_valid = 0;
+    #100;
+    
+    $display("\n[TEST 3] Maximum Non-Zero Value Stress Test");
+    $display("===========================================");
+    
+    global_valid = 1;
+    start_computation = 1;
+    
+    global_data_in_0 = 32'h7FFF_FFFF;
+    global_data_in_1 = 32'h3FFF_FFFF;
+    global_data_in_2 = 32'h1FFF_FFFF;
+    global_data_in_3 = 32'h0FFF_FFFF;
+    
+    global_weight_in_0 = 32'h00FF_FFFF;
+    global_weight_in_1 = 32'h007F_FFFF;
+    global_weight_in_2 = 32'h003F_FFFF;
+    global_weight_in_3 = 32'h001F_FFFF;
+    
+    $display("MAX DATA:   D0=%h, D1=%h, D2=%h, D3=%h", 
+            global_data_in_0, global_data_in_1, global_data_in_2, global_data_in_3);
+    $display("MAX WEIGHTS: W0=%h, W1=%h, W2=%h, W3=%h", 
+            global_weight_in_0, global_weight_in_1, global_weight_in_2, global_weight_in_3);
+    
+    #100;
+    
+    $display("MAX RESULTS: P0=%h, P1=%h, P2=%h, P3=%h", 
+            global_psum_out_0, global_psum_out_1, global_psum_out_2, global_psum_out_3);
+    
+    start_computation = 0;
+    global_valid = 0;
+    #100;
+    
+    $display("\n[TEST 4] All Bits Active Pattern Test");
+    $display("=====================================");
+    
+    global_valid = 1;
+    start_computation = 1;
+    
+    global_data_in_0 = 32'hAAAA_AAAA;
+    global_data_in_1 = 32'h5555_5555;
+    global_data_in_2 = 32'hFFFF_0000;
+    global_data_in_3 = 32'h0000_FFFF;
+    
+    global_weight_in_0 = 32'h1234_5678;
+    global_weight_in_1 = 32'h8765_4321;
+    global_weight_in_2 = 32'hF0F0_F0F0;
+    global_weight_in_3 = 32'h0F0F_0F0F;
+    
+    #50;
+    
+    $display("BIT PATTERN RESULTS: P0=%h, P1=%h, P2=%h, P3=%h", 
+            global_psum_out_0, global_psum_out_1, global_psum_out_2, global_psum_out_3);
+    
+    start_computation = 0;
+    global_valid = 0;
+    #100;
+    
+    $display("\n==================================================");
+    $display("               TEST SUMMARY");
+    $display("==================================================");
+    $display("Total Errors Detected: %0d", error_count);
+    $display("Final PSUM Results:");
+    $display("  PSUM0 = %h (%0d)", global_psum_out_0, global_psum_out_0);
+    $display("  PSUM1 = %h (%0d)", global_psum_out_1, global_psum_out_1);
+    $display("  PSUM2 = %h (%0d)", global_psum_out_2, global_psum_out_2);
+    $display("  PSUM3 = %h (%0d)", global_psum_out_3, global_psum_out_3);
+    
+    if (error_count == 0) begin
+        $display("✅ SUCCESS: All tests passed! All bits processed with non-zero values.");
+    end else begin
+        $display("❌ FAILED: %0d errors detected!", error_count);
+    end
+    
+    $display("==================================================");
+    $finish;
+end
+
+// Real-time monitoring
+initial begin
+    #10;
+    forever begin
+        #50;
+        if (reset_n && global_valid) begin
+            $display("[MONITOR] PSUMs: %h %h %h %h", 
+                    global_psum_out_0, global_psum_out_1, 
+                    global_psum_out_2, global_psum_out_3);
+        end
+    end
+end
+
+endmodule
