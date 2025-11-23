@@ -1,0 +1,315 @@
+module systolic_array_4x4_fixed(
+    input wire clk,
+    input wire reset_n,
+    input wire signed [31:0] global_data_in_0,
+    input wire signed [31:0] global_data_in_1,
+    input wire signed [31:0] global_data_in_2,
+    input wire signed [31:0] global_data_in_3,
+    input wire signed [31:0] global_weight_in_0,
+    input wire signed [31:0] global_weight_in_1,
+    input wire signed [31:0] global_weight_in_2,
+    input wire signed [31:0] global_weight_in_3,
+    input wire global_valid,
+    input wire load_weights,
+    input wire start_computation,
+    output wire signed [63:0] global_psum_out_0,
+    output wire signed [63:0] global_psum_out_1,
+    output wire signed [63:0] global_psum_out_2,
+    output wire signed [63:0] global_psum_out_3,
+    output wire global_done
+);
+
+wire signed [31:0] data_0_0, data_0_1, data_0_2, data_0_3;
+wire signed [31:0] data_1_0, data_1_1, data_1_2, data_1_3;
+wire signed [31:0] data_2_0, data_2_1, data_2_2, data_2_3;
+wire signed [31:0] data_3_0, data_3_1, data_3_2, data_3_3;
+
+wire signed [31:0] weight_0_0, weight_0_1, weight_0_2, weight_0_3;
+wire signed [31:0] weight_1_0, weight_1_1, weight_1_2, weight_1_3;
+wire signed [31:0] weight_2_0, weight_2_1, weight_2_2, weight_2_3;
+wire signed [31:0] weight_3_0, weight_3_1, weight_3_2, weight_3_3;
+
+wire signed [63:0] psum_0_0, psum_0_1, psum_0_2, psum_0_3;
+wire signed [63:0] psum_1_0, psum_1_1, psum_1_2, psum_1_3;
+wire signed [63:0] psum_2_0, psum_2_1, psum_2_2, psum_2_3;
+wire signed [63:0] psum_3_0, psum_3_1, psum_3_2, psum_3_3;
+
+reg [3:0] load_weight_delay;
+reg [3:0] enable_mac_delay;
+reg global_valid_delayed;
+
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n) begin
+        load_weight_delay <= 4'b0;
+        enable_mac_delay <= 4'b0;
+        global_valid_delayed <= 1'b0;
+    end else begin
+        load_weight_delay <= {load_weight_delay[2:0], (load_weights && global_valid)};
+        enable_mac_delay <= {enable_mac_delay[2:0], (start_computation && global_valid)};
+        global_valid_delayed <= global_valid;
+    end
+end
+
+wire load_weight_active = |load_weight_delay;
+wire enable_mac_active = |enable_mac_delay;
+wire clear_psum_all = 1'b0;
+
+processing_element pe_0_0 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(global_data_in_0),
+    .weight_in(global_weight_in_0),
+    .psum_in(64'sd0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_0_0),
+    .weight_out(weight_0_0),
+    .psum_out(psum_0_0),
+    .overflow()
+);
+
+processing_element pe_0_1 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_0_0),
+    .weight_in(global_weight_in_1),
+    .psum_in(64'sd0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_0_1),
+    .weight_out(weight_0_1),
+    .psum_out(psum_0_1),
+    .overflow()
+);
+
+processing_element pe_0_2 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_0_1),
+    .weight_in(global_weight_in_2),
+    .psum_in(64'sd0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_0_2),
+    .weight_out(weight_0_2),
+    .psum_out(psum_0_2),
+    .overflow()
+);
+
+processing_element pe_0_3 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_0_2),
+    .weight_in(global_weight_in_3),
+    .psum_in(64'sd0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_0_3),
+    .weight_out(weight_0_3),
+    .psum_out(psum_0_3),
+    .overflow()
+);
+
+processing_element pe_1_0 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(global_data_in_1),
+    .weight_in(weight_0_0),
+    .psum_in(psum_0_0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_1_0),
+    .weight_out(weight_1_0),
+    .psum_out(psum_1_0),
+    .overflow()
+);
+
+processing_element pe_1_1 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_1_0),
+    .weight_in(weight_0_1),
+    .psum_in(psum_0_1),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_1_1),
+    .weight_out(weight_1_1),
+    .psum_out(psum_1_1),
+    .overflow()
+);
+
+processing_element pe_1_2 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_1_1),
+    .weight_in(weight_0_2),
+    .psum_in(psum_0_2),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_1_2),
+    .weight_out(weight_1_2),
+    .psum_out(psum_1_2),
+    .overflow()
+);
+
+processing_element pe_1_3 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_1_2),
+    .weight_in(weight_0_3),
+    .psum_in(psum_0_3),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_1_3),
+    .weight_out(weight_1_3),
+    .psum_out(psum_1_3),
+    .overflow()
+);
+
+processing_element pe_2_0 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(global_data_in_2),
+    .weight_in(weight_1_0),
+    .psum_in(psum_1_0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_2_0),
+    .weight_out(weight_2_0),
+    .psum_out(psum_2_0),
+    .overflow()
+);
+
+processing_element pe_2_1 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_2_0),
+    .weight_in(weight_1_1),
+    .psum_in(psum_1_1),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_2_1),
+    .weight_out(weight_2_1),
+    .psum_out(psum_2_1),
+    .overflow()
+);
+
+processing_element pe_2_2 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_2_1),
+    .weight_in(weight_1_2),
+    .psum_in(psum_1_2),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_2_2),
+    .weight_out(weight_2_2),
+    .psum_out(psum_2_2),
+    .overflow()
+);
+
+processing_element pe_2_3 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_2_2),
+    .weight_in(weight_1_3),
+    .psum_in(psum_1_3),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_2_3),
+    .weight_out(weight_2_3),
+    .psum_out(psum_2_3),
+    .overflow()
+);
+
+processing_element pe_3_0 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(global_data_in_3),
+    .weight_in(weight_2_0),
+    .psum_in(psum_2_0),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_3_0),
+    .weight_out(weight_3_0),
+    .psum_out(psum_3_0),
+    .overflow()
+);
+
+processing_element pe_3_1 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_3_0),
+    .weight_in(weight_2_1),
+    .psum_in(psum_2_1),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_3_1),
+    .weight_out(weight_3_1),
+    .psum_out(psum_3_1),
+    .overflow()
+);
+
+processing_element pe_3_2 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_3_1),
+    .weight_in(weight_2_2),
+    .psum_in(psum_2_2),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_3_2),
+    .weight_out(weight_3_2),
+    .psum_out(psum_3_2),
+    .overflow()
+);
+
+processing_element pe_3_3 (
+    .clk(clk),
+    .reset_n(reset_n),
+    .data_in(data_3_2),
+    .weight_in(weight_2_3),
+    .psum_in(psum_2_3),
+    .load_weight(load_weight_active),
+    .clear_psum(clear_psum_all),
+    .enable_mac(enable_mac_active),
+    .data_out(data_3_3),
+    .weight_out(weight_3_3),
+    .psum_out(psum_3_3),
+    .overflow()
+);
+
+assign global_psum_out_0 = psum_3_0;
+assign global_psum_out_1 = psum_3_1;
+assign global_psum_out_2 = psum_3_2;
+assign global_psum_out_3 = psum_3_3;
+
+reg [7:0] computation_timer;
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n) begin
+        computation_timer <= 8'd0;
+    end else if (start_computation) begin
+        computation_timer <= 8'd50;
+    end else if (computation_timer > 0) begin
+        computation_timer <= computation_timer - 1;
+    end
+end
+
+assign global_done = (computation_timer == 8'd1);
+
+endmodule
