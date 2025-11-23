@@ -1,0 +1,45 @@
+module csd (
+    input  wire        clk,
+    input  wire        rst_n,
+    input  wire        enable,
+    input  wire [7:0]  csd_weight,
+    input  wire [7:0]  in_mag,
+    input  wire        in_sign,
+    output reg signed [7:0] result
+);
+
+    
+    reg [7:0] csd_weight_sync, in_mag_sync;
+    reg in_sign_sync;
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            csd_weight_sync <= 8'b0;
+            in_mag_sync <= 8'b0;
+            in_sign_sync <= 1'b0;
+        end else if (enable) begin
+            csd_weight_sync <= csd_weight;
+            in_mag_sync <= in_mag;
+            in_sign_sync <= in_sign;
+        end
+    end
+
+    
+    wire [7:0] mag_clamped = (in_mag_sync > 8'd127) ? 8'd127 : in_mag_sync;
+    wire signed [7:0] in_sample_signed = in_sign_sync ? -$signed({1'b0, mag_clamped[6:0]}) : $signed({1'b0, mag_clamped[6:0]});
+    wire signed [7:0] weight_signed = $signed(csd_weight_sync);
+    wire signed [15:0] prod = in_sample_signed * weight_signed;
+
+    
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            result <= 8'b0;
+        end else if (enable) begin
+            if (prod > 16'sd127) 
+                result <= 8'sd127;
+            else if (prod < -16'sd128) 
+                result <= -8'sd128;
+            else 
+                result <= prod[7:0];
+        end
+    end
+endmodule
