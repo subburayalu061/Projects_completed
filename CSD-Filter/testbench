@@ -1,0 +1,136 @@
+`timescale 1ns/1ps
+
+module tb;
+
+reg clk, rst_n, enable;
+reg [7:0] csd_weight, in_mag;
+reg in_sign;
+wire signed [7:0] csd_result;
+
+reg signed [7:0] desired;
+wire signed [7:0] error;
+wire [7:0] error_mag;
+wire error_sign;
+wire [15:0] mse;
+
+integer cycle_count;
+
+csd u_csd (
+    .clk(clk),
+    .rst_n(rst_n),
+    .enable(enable),
+    .csd_weight(csd_weight),
+    .in_mag(in_mag),
+    .in_sign(in_sign),
+    .result(csd_result)
+);
+
+error_block u_error_block (
+    .clk(clk),
+    .rst_n(rst_n),
+    .enable(enable),
+    .actual_output(csd_result),
+    .desired_output(desired),
+    .error(error),
+    .error_mag(error_mag),
+    .error_sign(error_sign),
+    .mse(mse)
+);
+
+always #5 clk = ~clk;
+
+function [7:0] adapt_weight;
+    input [7:0] current_weight;
+    input signed [7:0] current_output;
+    input signed [7:0] target;
+    input [7:0] input_mag;
+    input input_sign;
+
+    reg signed [15:0] error;
+    reg signed [15:0] required_weight;
+    reg signed [15:0] new_weight;
+    reg signed [7:0] effective_input;
+
+    begin
+        error = target - current_output;
+
+        if (input_sign)
+            effective_input = -$signed(input_mag);
+        else
+            effective_input = $signed(input_mag);
+
+        if (effective_input != 0)
+            required_weight = target / effective_input;
+        else
+            required_weight = current_weight;
+
+        if (required_weight > $signed({1'b0, current_weight}))
+            new_weight = current_weight + 1;
+        else if (required_weight < $signed({1'b0, current_weight}))
+            new_weight = current_weight - 1;
+        else
+            new_weight = current_weight;
+
+        if (new_weight > 127)
+            new_weight = 127;
+        else if (new_weight < -128)
+            new_weight = -128;
+
+        adapt_weight = new_weight[7:0];
+    end
+endfunction
+
+task run_test;
+    input signed [7:0] target;
+    input [7:0] input_mag;
+    input input_sgn;
+
+    begin
+        desired = target;
+        in_mag = input_mag;
+        in_sign = input_sgn;
+        cycle_count = 0;
+        csd_weight = 8'd1;
+
+        while (cycle_count < 20) begin
+            #10;
+            if (!(csd_result >= (desired - 1) && csd_result <= (desired + 1)))
+                csd_weight = adapt_weight(csd_weight, csd_result, desired, in_mag, in_sign);
+
+            cycle_count = cycle_count + 1;
+        end
+    end
+endtask
+
+initial begin
+    clk = 0;
+    rst_n = 0;
+    enable = 0;
+    csd_weight = 8'd0;
+    in_mag = 8'd0;
+    in_sign = 1'b0;
+    desired = 8'd0;
+    cycle_count = 0;
+
+    #20;
+    rst_n = 1;
+    enable = 1;
+    #10;
+
+    run_test(8'd12, 8'd4, 1'b0);
+    #50;
+
+    run_test(8'd15, 8'd5, 1'b0);
+    #50;
+
+    run_test(8'd20, 8'd5, 1'b0);
+    #50;
+
+    run_test(8'd18, 8'd6, 1'b0);
+    #50;
+
+    #100;
+    $finish;
+end
+
+endmodule

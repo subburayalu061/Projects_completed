@@ -1,0 +1,91 @@
+`timescale 1ns/1ps
+
+module csd_encoder (
+    input  wire        clk,
+    input  wire        enable,
+    input  wire signed [7:0] weight_bin,
+    output reg  [7:0]  csd_mag,
+    output reg  [7:0]  csd_sign,
+    output reg         carry_out
+);
+
+    
+    reg [7:0] mag;
+    reg sign_bit;
+    reg [7:0] mag_bits;
+    reg carry;
+    reg [7:0] out_mag;
+    reg [7:0] out_sign;
+    reg next_bit;
+    integer i;
+
+    
+    always @(*) begin
+        
+        mag = 8'd0;
+        sign_bit = 1'b0;
+        mag_bits = 8'd0;
+        carry = 1'b0;
+        out_mag = 8'd0;
+        out_sign = 8'd0;
+        next_bit = 1'b0;
+
+        
+        if (weight_bin[7]) begin
+            mag = -weight_bin;
+            sign_bit = 1'b1;
+        end else begin
+            mag = weight_bin;
+            sign_bit = 1'b0;
+        end
+
+        mag_bits = mag;
+        carry = 1'b0;
+
+        
+        for (i = 0; i < 8; i = i + 1) begin
+            if (i < 7)
+                next_bit = mag_bits[i+1];
+            else
+                next_bit = 1'b0;
+
+            if (mag_bits[i] == 1'b0 && carry == 1'b0) begin
+                out_mag[i]  = 1'b0;
+                out_sign[i] = 1'b0;
+                carry = 1'b0;
+            end else if (mag_bits[i] == 1'b0 && carry == 1'b1) begin
+                if (next_bit == 1'b1) begin
+                    out_mag[i]  = 1'b1; out_sign[i] = 1'b1; carry = 1'b1;
+                end else begin
+                    out_mag[i]  = 1'b1; out_sign[i] = 1'b0; carry = 1'b0;
+                end
+            end else if (mag_bits[i] == 1'b1 && carry == 1'b0) begin
+                if (next_bit == 1'b1) begin
+                    out_mag[i]  = 1'b1; out_sign[i] = 1'b1; carry = 1'b1;
+                end else begin
+                    out_mag[i]  = 1'b1; out_sign[i] = 1'b0; carry = 1'b0;
+                end
+            end else begin
+                out_mag[i]  = 1'b0;
+                out_sign[i] = 1'b0;
+                carry = 1'b1;
+            end
+        end
+
+        
+        if (sign_bit) begin
+            for (i = 0; i < 8; i = i + 1)
+                if (out_mag[i]) out_sign[i] = ~out_sign[i];
+        end
+    end
+
+    
+    always @(posedge clk) begin
+        if (enable) begin
+            csd_mag <= out_mag;
+            csd_sign <= out_sign;
+            carry_out <= carry;
+        end
+    end
+
+endmodule
