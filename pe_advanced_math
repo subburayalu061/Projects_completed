@@ -1,0 +1,69 @@
+module pe_advanced_math(
+    input wire clk,
+    input wire reset_n,
+    input wire signed [31:0] operand_a,
+    input wire signed [31:0] operand_b,
+    input wire signed [63:0] operand_c,
+    input wire [2:0] operation,
+    input wire enable,
+    input wire clear,
+    output reg signed [63:0] result,
+    output reg result_valid
+);
+
+reg signed [31:0] a_reg, b_reg;
+reg signed [63:0] c_reg;
+reg signed [63:0] accumulator;
+reg [2:0] valid_pipeline;
+
+wire signed [63:0] a_ext;
+wire signed [63:0] b_ext;
+wire signed [63:0] add_result;
+wire signed [63:0] sub_result;
+wire signed [63:0] mul_result;
+wire signed [63:0] mac_result;
+wire signed [63:0] max_result;
+wire signed [63:0] min_result;
+wire signed [63:0] selected_result;
+
+assign a_ext = {{32{a_reg[31]}}, a_reg};
+assign b_ext = {{32{b_reg[31]}}, b_reg};
+assign add_result = a_ext + b_ext;
+assign sub_result = a_ext - b_ext;
+assign mul_result = $signed(a_reg) * $signed(b_reg);
+assign mac_result = accumulator + mul_result;
+assign max_result = (a_ext > b_ext) ? a_ext : b_ext;
+assign min_result = (a_ext < b_ext) ? a_ext : b_ext;
+
+assign selected_result =
+    (operation == 3'd0) ? add_result :
+    (operation == 3'd1) ? sub_result :
+    (operation == 3'd2) ? mul_result :
+    (operation == 3'd3) ? mac_result :
+    (operation == 3'd4) ? max_result :
+    (operation == 3'd5) ? min_result : 64'sd0;
+
+always @(posedge clk or negedge reset_n) begin
+    if (!reset_n) begin
+        a_reg <= 32'sd0;
+        b_reg <= 32'sd0;
+        c_reg <= 64'sd0;
+        accumulator <= 64'sd0;
+        result <= 64'sd0;
+        result_valid <= 1'b0;
+        valid_pipeline <= 3'b0;
+    end else begin
+        a_reg <= operand_a;
+        b_reg <= operand_b;
+        c_reg <= operand_c;
+        if (clear)
+            accumulator <= 64'sd0;
+        else if (enable)
+            accumulator <= selected_result;
+        result <= selected_result;
+        valid_pipeline <= {valid_pipeline[1:0], enable};
+        result_valid <= valid_pipeline[2];
+    end
+end
+
+endmodule

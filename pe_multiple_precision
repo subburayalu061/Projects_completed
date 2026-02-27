@@ -1,0 +1,63 @@
+module pe_multiple_precision(
+input wire clk,
+input wire reset_n,
+input wire [31:0] data_in,
+input wire [31:0] weight_in,
+input wire [63:0] psum_in,
+input wire [1:0] precision_mode,
+input wire signed_arithmetic,
+input wire load_weight,
+input wire clear_psum,
+input wire enable_mac,
+output reg [31:0] data_out,
+output reg [31:0] weight_out,
+output reg [63:0] psum_out
+);
+
+reg [31:0] data_reg;
+reg [31:0] weight_reg;
+reg signed [63:0] psum_reg;
+
+wire signed [31:0] data_converted;
+wire signed [31:0] weight_converted;
+wire signed [63:0] product;
+wire signed [63:0] sum_result;
+
+assign data_converted = (precision_mode == 2'b00) ?
+(signed_arithmetic ? {{24{data_reg[7]}}, data_reg[7:0]} : {24'b0, data_reg[7:0]}) :
+$signed(data_reg);
+
+assign weight_converted = (precision_mode == 2'b00) ?
+(signed_arithmetic ? {{24{weight_reg[7]}}, weight_reg[7:0]} : {24'b0, weight_reg[7:0]}) :
+$signed(weight_reg);
+
+assign product = $signed(data_converted) * $signed(weight_converted);
+assign sum_result = psum_reg + product;
+
+always @(posedge clk or negedge reset_n) begin
+if (!reset_n) begin
+data_reg <= 32'd0;
+weight_reg <= 32'd0;
+psum_reg <= 64'sd0;
+data_out <= 32'd0;
+weight_out <= 32'd0;
+psum_out <= 64'd0;
+end else begin
+data_reg <= data_in;
+data_out <= data_reg;
+
+    if (load_weight)
+        weight_reg <= weight_in;
+    weight_out <= weight_reg;
+
+    if (clear_psum)
+        psum_reg <= 64'sd0;
+    else if (enable_mac)
+        psum_reg <= sum_result;
+    psum_out <= psum_reg;
+end
+
+
+end
+
+endmodule
