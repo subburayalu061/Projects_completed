@@ -15,56 +15,56 @@ module Control_Unit(
 always @(*) begin
     case(opcode)
 
-        7'b0110011: begin // R
+        7'b0110011: begin 
             RegWrite=1; MemRead=0; MemWrite=0;
             Branch=0; Jump=0;
             ALUSrc=0; ALUOp=2'b10;
             ResultSrc=2'b00;Immb=0;
         end
 
-        7'b0010011: begin // I
+        7'b0010011: begin 
             RegWrite=1; MemRead=0; MemWrite=0;
             Branch=0; Jump=0;
             ALUSrc=1; ALUOp=2'b10;
             ResultSrc=2'b00;Immb=1;
         end
 
-        7'b0000011: begin // LW
+        7'b0000011: begin
             RegWrite=1; MemRead=1; MemWrite=0;
             Branch=0; Jump=0;
             ALUSrc=1; ALUOp=2'b00;
             ResultSrc=2'b01;Immb=0;
         end
 
-        7'b0100011: begin // SW
+        7'b0100011: begin
             RegWrite=0; MemRead=0; MemWrite=1;
             Branch=0; Jump=0;
             ALUSrc=1; ALUOp=2'b00;
             ResultSrc=2'b00;Immb=0;
         end
 
-        7'b1100011: begin // BEQ
+        7'b1100011: begin
             RegWrite=0; MemRead=0; MemWrite=0;
             Branch=1; Jump=0;
             ALUSrc=0; ALUOp=2'b01;
             ResultSrc=2'b00;Immb=0;
         end
 
-        7'b0110111: begin // LUI
+        7'b0110111: begin 
             RegWrite=1; MemRead=0; MemWrite=0;
             Branch=0; Jump=0;
             ALUSrc=1; ALUOp=2'b11;
             ResultSrc=2'b10;Immb=0;
         end
 
-        7'b0010111: begin // AUIPC
+        7'b0010111: begin
             RegWrite=1; MemRead=0; MemWrite=0;
             Branch=0; Jump=0;
             ALUSrc=1; ALUOp=2'b00;
             ResultSrc=2'b00;Immb=0;
         end
 
-7'b1101111: begin // JAL
+7'b1101111: begin 
     RegWrite = 1;
     MemRead  = 0;
     MemWrite = 0;
@@ -76,16 +76,16 @@ always @(*) begin
     Jalr = 0;
 end
 
-7'b1100111: begin // JALR
+7'b1100111: begin
     RegWrite = 1;
     MemRead  = 0;
     MemWrite = 0;
     Branch   = 0;
-    Jump     = 0;   // JALR is NOT JAL
-    ALUSrc   = 1;   // rs1 + imm
-    ALUOp    = 2'b00; // ADD
-    ResultSrc = 2'b11; // PC+4
-    Jalr = 1;       // <-- you need this signal
+    Jump     = 0;
+    ALUSrc   = 1;  
+    ALUOp    = 2'b00; 
+    ResultSrc = 2'b11; 
+    Jalr = 1;    
 end
 
         default: begin
