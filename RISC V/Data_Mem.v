@@ -12,9 +12,9 @@ module Data_Mem (
     integer i;
 
     wire [7:0] word_addr;
-    assign word_addr = addr[31:2];  // word-aligned
+    assign word_addr = addr[31:2];  
 
-    // Write + Reset logic
+   
     always @(posedge clk) begin
         if (reset) begin
             for (i = 0; i < 256; i = i + 1)
@@ -25,7 +25,7 @@ module Data_Mem (
         end
     end
 
-    // Read logic (combinational)
+
     always @(*) begin
         if (MemRead)
             read_data = mem[word_addr];
